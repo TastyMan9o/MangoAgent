@@ -1,0 +1,49 @@
+# 🤖 VideoAgent: 自动化视频灵感助手
+
+这是一个基于AI的自动化工具，旨在通过分析B站视频的热点和评论，智能生成和迭代用于文生视频模型的 Prompt。
+
+## ✨ 核心功能
+
+- **热点发现**: 自动搜索B站热门视频，并采用可定制化的热度算法进行排序。
+- **AI视频分析**: 集成Gemini 1.5多模态模型，通过分析视频内容，自动生成高质量的英文Prompt和中文标题。
+- **评论洞察与迭代**: 自动抓取指定视频的评论区，利用DeepSeek模型提炼视觉改进建议，实现Prompt的版本迭代。
+- **Web用户界面**: 使用Streamlit构建了功能完善的可视化操作后台，包括扫码登录、参数调整、交互式优化等。
+- **API服务**: 使用FastAPI构建了清晰的后端服务，实现了前后端分离。
+
+## 🚀 如何启动
+
+本项目包含一个后端API服务和一个前端UI，需要同时启动。
+
+### 方式一：一键启动 (推荐)
+
+直接双击项目根目录下的 `run_app.bat` 文件。
+
+它会自动打开两个终端窗口，分别启动后端和前端服务。
+
+### 方式二：手动启动
+
+如果你想分别控制，可以打开两个终端窗口，按顺序执行以下命令。
+
+**1. 在第一个终端启动后端服务:**
+```powershell
+# (可选) 为后端设置代理，用于访问Gemini
+$env:HTTPS_PROXY="[http://127.0.0.1:7890](http://127.0.0.1:7890)"
+
+# 启动FastAPI服务于8001端口
+uvicorn main:app --reload --port 8001
+```
+
+**2. 在第二个终端启动前端UI:**
+```powershell
+# 启动Streamlit应用
+streamlit run app.py
+```
+启动后，浏览器会自动打开 `http://localhost:8501`。
+
+## ⚙️ 技术栈
+
+- **后端**: FastAPI, Uvicorn, LangGraph
+- **前端**: Streamlit
+- **AI模型**: Google Gemini 1.5, DeepSeek
+- **数据采集**: requests, yt-dlp, browser-cookie3
+- **核心库**: pandas, qrcode

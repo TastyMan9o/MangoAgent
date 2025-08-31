@@ -1,0 +1,20 @@
+# Core
+pydantic>=2
+requests>=2.31
+python-dotenv>=1.0
+openai>=1.30
+langchain-core>=0.2
+langgraph>=0.2
+
+# Bilibili & Vision
+browser-cookie3>=0.19
+qrcode[pil]>=7.4
+yt-dlp>=2023.12.30
+google-generativeai>=0.4
+
+# Web API Server & Frontend
+fastapi>=0.108
+uvicorn[standard]>=0.25
+python-multipart>=0.0.7
+streamlit>=1.30
+pandas>=2.0

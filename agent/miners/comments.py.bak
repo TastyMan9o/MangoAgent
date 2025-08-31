@@ -1,0 +1,82 @@
+# -*- coding: utf-8 -*-
+"""
+agent/miners/comments.py
+===========================================================
+评论挖掘模块（抓评 → LLM 严格 JSON 洞察）：
+  - 输入：Video（含 bvid/title/url）与抓到的评论文本
+  - 输出：严格匹配 InsightDoc 的 JSON（与前面你贴的结构兼容）
+  - 依赖：
+      - DeepSeek 小模型（.env: DEEPSEEK_API_KEY）
+      - 我们自己的 InsightDoc Schema（agent/miners/insight_schema.py）
+"""
+
+import os, json, random
+from typing import List, Dict, Any
+from dotenv import load_dotenv
+from openai import OpenAI
+from pydantic import ValidationError
+
+from agent.miners.insight_schema import InsightDoc
+from agent.collectors.bilibili import Video
+
+load_dotenv()
+
+SYSTEM_MSG = """你是一个评论洞察助手。请将输入的评论进行去噪归纳，输出严格 JSON：
+- 结构必须匹配 InsightDoc：{ topics:[{label,size,sentiment_ratio,key_quotes,insight,actions[{type,delta,priority_ice{impact,confidence,effort,score}}]}], global_recs:{ prompt_deltas:[], thumbnails:[], titles:[] } }
+- 所有说明字段统一使用英文；key_quotes 保留原文（可有 emoji）。
+- size 取该话题下评论条数估计值；sentiment_ratio 各项相加约等于 1.0。
+- actions[].type 可取：prompt_delta / thumbnail / title / editing 等（可扩展）。
+- priority_ice.score = impact*0.5 + confidence*0.4 - effort*0.2（示例权重，0-1）。
+- 仅返回 JSON 对象，不要解释。
+"""
+
+USER_TMPL = """COMMENTS (sampled):
+{comments_json}
+
+VIDEO META:
+title: {title}
+url: {url}
+
+请输出严格 JSON（与 InsightDoc 匹配）。"""
+
+def _client() -> OpenAI:
+    key = os.getenv("DEEPSEEK_API_KEY")
+    if not key:
+        raise RuntimeError("缺少 DEEPSEEK_API_KEY，请在 .env 设置。")
+    return OpenAI(api_key=key, base_url="https://api.deepseek.com")
+
+def analyze_comments_to_insight(video: Video, comments: List[Dict[str, Any]], model: str = "deepseek-chat") -> Dict[str, Any]:
+    """
+    用小模型把评论转为洞察（严格 JSON），返回 dict（已通过 Pydantic 校验）。
+    """
+    # 采样最多 200 条，避免 prompt 过长
+    texts = [c.get("text","") for c in comments if c.get("text")]
+    if not texts:
+        # 无评论也返回一个空结构，避免中断
+        empty = {"topics": [], "global_recs": {"prompt_deltas": [], "thumbnails": [], "titles": []}}
+        InsightDoc(**empty)  # 校验
+        return empty
+    sample = texts[:200]
+    payload = USER_TMPL.format(
+        comments_json=json.dumps(sample, ensure_ascii=False, indent=2),
+        title=video.title, url=video.url
+    )
+    resp = _client().chat.completions.create(
+        model=model,
+        messages=[{"role":"system","content":SYSTEM_MSG},
+                  {"role":"user","content":payload}],
+        temperature=0.3,
+    )
+    content = resp.choices[0].message.content.strip()
+    # 去除 ```json 围栏
+    if content.startswith("```"):
+        content = content.strip("`").replace("json","",1).strip()
+    try:
+        obj = json.loads(content)
+    except Exception as e:
+        raise RuntimeError(f"模型未返回合法 JSON：\n{content}") from e
+    try:
+        InsightDoc(**obj)
+    except ValidationError as e:
+        raise RuntimeError(f"洞察 JSON 不符合 InsightDoc：{e}")
+    return obj

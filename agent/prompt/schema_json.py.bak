@@ -1,0 +1,59 @@
+# -*- coding: utf-8 -*-
+"""
+英文 JSON Prompt 的统一结构（Pydantic 校验）
+"""
+from typing import List, Optional, Literal
+from pydantic import BaseModel, Field, validator
+
+class Beat(BaseModel):
+    start_sec: float = Field(..., ge=0, description="开始时间（秒）")
+    end_sec: float = Field(..., ge=0, description="结束时间（秒）")
+    description: str = Field(..., description="该时间段内发生的事情（英文）")
+
+    @validator("end_sec")
+    def _end_after_start(cls, v, values):
+        if "start_sec" in values and v < values["start_sec"]:
+            raise ValueError("end_sec 必须 >= start_sec")
+        return v
+
+class Timing(BaseModel):
+    duration_seconds: float = Field(..., gt=0, description="总时长（秒）")
+    beats: List[Beat] = Field(default_factory=list, description="关键片段列表")
+
+class Shot(BaseModel):
+    camera: str = Field(..., description="机位与运动，如 'macro close-up, slow dolly-in'")
+    composition: str = Field(..., description="构图与取景")
+    focal_subject: str = Field(..., description="焦点对象")
+    movement_speed: Optional[str] = Field(None, description="运动速度，如 'slow'")
+
+class VeoParams(BaseModel):
+    aspect_ratio: Literal["16:9", "9:16", "1:1"] = "16:9"
+    person_generation: Literal["dont_allow", "allow_adult", "allow_all"] = "dont_allow"
+    negative_prompt: str = Field(
+        "cartoon, drawing, low quality, overexposure, blurry",
+        description="要避免的内容（英文逗号分隔）"
+    )
+
+class PromptBody(BaseModel):
+    concept: str = Field(..., description="核心主题与氛围（英文）")
+    shots: List[Shot] = Field(default_factory=list, description="镜头级指令")
+    actions: List[str] = Field(default_factory=list, description="动作/行为（英文短句）")
+    lighting: str = Field(..., description="光线方案")
+    style: str = Field(..., description="风格，如 'photorealistic, shallow depth of field'")
+    audio: Optional[str] = Field(None, description="ASMR/环境声/音乐")
+    timing: Timing = Field(..., description="时长与关键片段")
+    constraints: List[str] = Field(default_factory=list, description="硬约束与安全限制")
+
+class PromptMeta(BaseModel):
+    source: Literal["hotspot", "series_iteration", "manual"] = "manual"
+    topic: str
+    series: Optional[str] = None
+    created_at: str
+    parent_prompt_id: Optional[str] = None
+    notes: Optional[str] = None
+
+class VideoPromptJSON(BaseModel):
+    name: str
+    meta: PromptMeta
+    veo_params: VeoParams
+    prompt: PromptBody

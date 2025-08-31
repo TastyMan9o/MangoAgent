@@ -1,0 +1,97 @@
+\
+# -*- coding: utf-8 -*-
+"""
+agent/reports/trace_report.py
+===========================================================
+作用：
+  把“迭代溯源数据”写成 JSON + Markdown：
+    - 每条被采用的改动（delta）来自哪个视频/哪个话题/哪条 action
+    - 给出 2~3 条代表性评论（supporting_quotes）
+    - 记录抽样评论数量与预览
+"""
+
+import os, json
+from datetime import datetime
+from typing import List, Dict, Any
+from agent.utils.io import ensure_dir, write_json
+
+def _ts() -> str:
+    return datetime.now().strftime("%Y%m%d_%H%M")
+
+def _md_escape(s: str) -> str:
+    return s.replace("|","\\|").replace("\n"," ").strip()
+
+def save_trace_bundle(base_prompt_path: str,
+                      new_prompt_path: str,
+                      space_url: str,
+                      filter_keyword: str,
+                      trace_items: List[Dict[str, Any]]) -> str:
+    """
+    写出两份文件：
+      - outputs/traces/trace_YYYYMMDD_HHMM.json
+      - outputs/traces/trace_YYYYMMDD_HHMM.md
+    返回 Markdown 路径，便于你直接打开查看。
+    """
+    ensure_dir("outputs/traces")
+    ts = _ts()
+    json_path = os.path.join("outputs","traces", f"trace_{ts}.json")
+    md_path = os.path.join("outputs","traces", f"trace_{ts}.md")
+
+    # JSON：原始数据完整保存
+    data = {
+        "base_prompt_path": base_prompt_path,
+        "new_prompt_path": new_prompt_path,
+        "space_url": space_url,
+        "filter_keyword": filter_keyword,
+        "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "items": trace_items
+    }
+    write_json(json_path, data)
+
+    # Markdown：人类可读摘要
+    lines = []
+    lines.append(f"# Iteration Trace Report ({ts})")
+    lines.append("")
+    lines.append(f"- **Base Prompt**: `{base_prompt_path}`")
+    lines.append(f"- **New Prompt**:  `{new_prompt_path}`")
+    lines.append(f"- **Space URL**:   {space_url}")
+    lines.append(f"- **Filter**:      {filter_keyword or '(none)'}")
+    lines.append("")
+    for idx, it in enumerate(trace_items, 1):
+        v = it["video"]
+        lines.append(f"## Video {idx}: [{_md_escape(v['title'])}]({v['url']}) (bvid: {v['bvid']})")
+        lines.append(f"- Comments sampled: **{it['comments_sampled_count']}**")
+        if it.get("comments_sampled_preview"):
+            # 展示前 3 条预览
+            lines.append("  - Preview:")
+            for t in it["comments_sampled_preview"][:3]:
+                lines.append(f"    - {_md_escape(t)}")
+        lines.append("")
+        if not it.get("adopted_deltas"):
+            lines.append("> No adopted visual deltas.")
+            lines.append("")
+            continue
+        lines.append("| Adopted Delta (path) | Value / Action | Topic | Supporting Quotes |")
+        lines.append("|---|---|---|---|")
+        for d in it["adopted_deltas"]:
+            delta = d["delta"]
+            path = _md_escape(delta.get("path",""))
+            val = delta.get("value","")
+            if isinstance(val, dict):
+                val_repr = _md_escape(json.dumps(val, ensure_ascii=False))
+            else:
+                val_repr = _md_escape(str(val))
+            topic = _md_escape(d.get("topic_label") or "")
+            supp = d.get("supporting_quotes") or []
+            supp_md = "<br>".join(_md_escape(x) for x in supp[:3]) if supp else ""
+            # 附上原 action 文本，帮助理解
+            action_txt = _md_escape(d.get("from_action_text") or "")
+            lines.append(f"| `{path}` | {val_repr}<br><sub>action: {action_txt}</sub> | {topic} | {supp_md} |")
+        lines.append("")
+
+    with open(md_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+    print(f"[ok] 溯源 JSON：{json_path}")
+    print(f"[ok] 溯源 Markdown：{md_path}")
+    return md_path

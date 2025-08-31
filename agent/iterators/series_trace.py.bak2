@@ -1,0 +1,91 @@
+\
+# -*- coding: utf-8 -*-
+"""
+agent/iterators/series_trace.py  （strict_space 调用修正版）
+"""
+
+import os, json
+from typing import List, Dict, Any, Tuple
+from agent.collectors.bilibili import list_space_videos, fetch_comments, Video
+from agent.miners.comments import analyze_comments_to_insight
+from agent.iterators.delta_normalizer import normalize_to_visual_deltas
+from agent.iterators.merge_policy import apply_deltas
+from agent.prompt.schema_json import VideoPromptJSON
+from agent.interactive.refiner import save_refined_version
+from agent.reports.trace_report import save_trace_bundle
+
+def _load_json(path: str) -> Dict[str, Any]:
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def _select_visual_deltas_with_evidence(insight: Dict[str, Any], top_k: int = 3) -> List[Dict[str, Any]]:
+    flat = []
+    for t in insight.get("topics", []):
+        label = t.get("label") or ""
+        topic_quotes = t.get("key_quotes") or []
+        for a in t.get("actions", []):
+            sc = ((a.get("priority_ice") or {}).get("score") or 0.0)
+            flat.append((float(sc), a, label, topic_quotes))
+    flat.sort(key=lambda x: x[0], reverse=True)
+
+    picked = []
+    for _, action, label, quotes in flat:
+        vis = normalize_to_visual_deltas([action], top_k=1)
+        if not vis:
+            continue
+        delta = vis[0]
+        picked.append({
+            "delta": delta,
+            "from_action_text": action.get("delta") or "",
+            "topic_label": label,
+            "supporting_quotes": list(quotes[:3])
+        })
+        if len(picked) >= top_k:
+            break
+    return picked
+
+def iterate_series_with_trace(base_prompt_path: str,
+                              space_url: str,
+                              filter_keyword: str = "",
+                              limit_videos: int = 3,
+                              max_comments: int = 200,
+                              top_deltas: int = 3) -> Tuple[str, str]:
+    base = _load_json(base_prompt_path)
+    _ = VideoPromptJSON(**base)
+
+    # 关键：strict_space=True
+    videos: List[Video] = list_space_videos(space_url, filter_keyword, limit_videos, strict_space=True)
+    if not videos:
+        raise RuntimeError("未获取到系列视频，请检查空间链接/关键词/风控。")
+
+    trace_items = []
+    all_deltas = []
+
+    for v in videos:
+        comments = fetch_comments(v.bvid, max_comments=max_comments)
+        insight = analyze_comments_to_insight(v, comments)
+        vis_with_evd = _select_visual_deltas_with_evidence(insight, top_k=top_deltas)
+
+        trace_items.append({
+            "video": {"bvid": v.bvid, "title": v.title, "url": v.url, "pubdate": v.pubdate, "stats": v.stats},
+            "comments_sampled_count": len(comments),
+            "comments_sampled_preview": [c.get("text","") for c in comments[:10]],
+            "insight": insight,
+            "adopted_deltas": vis_with_evd
+        })
+
+        for item in vis_with_evd:
+            all_deltas.append(item["delta"])
+
+    all_deltas = all_deltas[:top_deltas]
+    new_json = apply_deltas(base, all_deltas)
+    new_path = save_refined_version(new_json, base_json_path=base_prompt_path)
+
+    report_path = save_trace_bundle(
+        base_prompt_path=base_prompt_path,
+        new_prompt_path=new_path,
+        space_url=space_url,
+        filter_keyword=filter_keyword,
+        trace_items=trace_items
+    )
+    return new_path, report_path

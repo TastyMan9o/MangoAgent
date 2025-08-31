@@ -1,0 +1,357 @@
+
+# -*- coding: utf-8 -*-
+"""
+agent/collectors/bilibili.py
+===========================================================
+B 站采集器（strict_space + 正确评论抓取）：
+  - 默认 strict_space=True：只取该空间的视频
+  - 降级顺序：A) WBI 接口 -> B) HTML 降级解析
+    * 只有在 strict_space=False 时，且前两层失败，才会使用“全站关键词搜索”兜底
+  - 评论抓取：先把 bvid 解析为 aid，再调用 x/v2/reply（oid=aid）
+"""
+
+import os, re, time, json, hashlib, requests
+from typing import List, Dict, Any, Optional
+from dataclasses import dataclass
+from urllib.parse import urlencode
+from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DEBUG = os.getenv('BILI_DEBUG','') == '1'
+
+BILI_COOKIE = os.getenv("BILI_COOKIE", "")
+UA = os.getenv("BILI_UA", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                          "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+SESSION = requests.Session()
+SESSION.headers.update({"User-Agent": UA})
+if BILI_COOKIE:
+    SESSION.headers.update({"Cookie": BILI_COOKIE})
+
+@dataclass
+class Video:
+    bvid: str
+    title: str
+    url: str
+    pubdate: int
+    stats: Dict[str, Any]
+
+def _safe_get(url: str, params: Dict[str, Any] = None, timeout: int = 8) -> Dict[str, Any]:
+    for _ in range(2):
+        try:
+            r = SESSION.get(url, params=params, timeout=timeout)
+            if r.status_code == 200:
+                try:
+                    return r.json()
+                except:
+                    return {"_text": r.text}
+            elif r.status_code in (403, 412):
+                print(f"[warn] HTTP {r.status_code} {url}")
+                return {}
+        except Exception:
+            time.sleep(0.7)
+    return {}
+
+def _mid_from_space_url(space_url: str) -> str:
+    m = re.search(r"space\.bilibili\.com/(\d+)", space_url)
+    return m.group(1) if m else ""
+
+# --------- WBI 签名（同前，略注释） ---------
+def _wbi_keys() -> Dict[str, str]:
+    url = "https://api.bilibili.com/x/web-interface/nav"
+    data = _safe_get(url)
+    try:
+        img_url = data["data"]["wbi_img"]["img_url"]
+        sub_url = data["data"]["wbi_img"]["sub_url"]
+        img_key = img_url.rsplit("/", 1)[-1].split(".")[0]
+        sub_key = sub_url.rsplit("/", 1)[-1].split(".")[0]
+        return {"img_key": img_key, "sub_key": sub_key}
+    except Exception:
+        return {}
+
+def _wbi_sign(params: Dict[str, Any], img_key: str, sub_key: str) -> Dict[str, Any]:
+    params = dict(sorted(params.items()))
+    params["wts"] = int(time.time())
+    flt = ["!", "'", "(", ")", "*"]
+    for k, v in list(params.items()):
+        if isinstance(v, str):
+            for ch in flt:
+                v = v.replace(ch, "")
+            params[k] = v
+    mixin = img_key + sub_key
+    order = [46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 5, 49, 33,
+             9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13, 37, 48, 7, 16, 24, 55, 57, 40,
+             52, 1, 54, 30, 4, 22, 56, 21, 43, 17, 0, 34, 51, 20, 26, 6, 25, 11, 36, 44]
+    mixin_key = "".join([mixin[i] for i in order if i < len(mixin)])
+    query = urlencode(params)
+    wbi_sign = hashlib.md5((query + mixin_key).encode()).hexdigest()
+    params["w_rid"] = wbi_sign
+    return params
+
+def _space_videos_wbi(mid: str, page: int = 1, ps: int = 30) -> Dict[str, Any]:
+    keys = _wbi_keys()
+    if not keys:
+        return {}
+    url = "https://api.bilibili.com/x/space/wbi/arc/search"
+    base = {"mid": mid, "pn": page, "ps": ps, "order": "pubdate"}
+    signed = _wbi_sign(base, keys["img_key"], keys["sub_key"])
+    return _safe_get(url, params=signed)
+
+# --------- HTML 降级解析（只取该空间） ---------
+def _space_html_videos(space_url: str, limit: int = 30) -> List[Dict[str, Any]]:
+    out = []
+    try:
+        r = SESSION.get(space_url, timeout=8)
+        if r.status_code != 200:
+            return out
+        m = re.search(r"__INITIAL_STATE__=(\{.*?\});", r.text, flags=re.S)
+        if not m:
+            return out
+        data = json.loads(m.group(1))
+        cards = data.get("space", {}).get("cards", []) or data.get("cards", [])
+        for c in cards:
+            try:
+                v = c.get("archive", {}) or c.get("card", {})
+                bvid = v.get("bvid") or v.get("param")
+                title = v.get("title") or v.get("name")
+                pubdate = int(v.get("ctime") or v.get("pubdate") or 0)
+                if not bvid:
+                    continue
+                out.append({
+                    "bvid": bvid,
+                    "title": title,
+                    "url": f"https://www.bilibili.com/video/{bvid}",
+                    "pubdate": pubdate,
+                    "stats": {}
+                })
+            except:
+                continue
+            if len(out) >= limit:
+                break
+    except Exception:
+        return []
+    return out
+
+# --------- 全站关键词搜索（仅在 strict_space=False 时使用） ---------
+def _search_by_keyword(keyword: str, page: int = 1) -> Dict[str, Any]:
+    url = "https://api.bilibili.com/x/web-interface/search/type"
+    params = {"search_type": "video", "keyword": keyword, "page": page}
+    return _safe_get(url, params=params)
+
+# --------- bvid -> aid 解析 ---------
+def _bvid_to_aid(bvid: str) -> Optional[int]:
+    """调用 view 接口解析 aid，失败返回 None"""
+    url = "https://api.bilibili.com/x/web-interface/view"
+    data = _safe_get(url, params={"bvid": bvid})
+    try:
+        return int(data["data"]["aid"])
+    except Exception:
+        return None
+
+# --------- 对外函数 ---------
+def list_space_videos(space_url: str,
+                      filter_keyword: str = "",
+                      limit: int = 10,
+                      strict_space: bool = True) -> List[Video]:
+    """
+    获取“该空间”最近视频（默认 strict_space=True）。
+    降级顺序：WBI -> HTML；strict_space=False 且前两层失败时才使用“全站搜索”兜底。
+    """
+    items = []
+    mid = _mid_from_space_url(space_url)
+
+    # A：WBI
+    if mid:
+        data = _space_videos_wbi(mid, page=1, ps=max(30, limit))
+        try:
+            vlist = data["data"]["list"]["vlist"]
+            for v in vlist:
+                bvid = v.get("bvid")
+                if not bvid:
+                    continue
+                items.append({
+                    "bvid": bvid,
+                    "title": v.get("title"),
+                    "url": f"https://www.bilibili.com/video/{bvid}",
+                    "pubdate": int(v.get("created") or v.get("pubdate") or 0),
+                    "stats": {"views": v.get("play"), "comments": v.get("comment")}
+                })
+        except Exception:
+            pass
+
+    if DEBUG: print('[dbg] after WBI: items=%d' % len(items))
+    if not items:
+        items = _space_html_videos(space_url, limit=max(30, limit))
+
+    if DEBUG: print('[dbg] after HTML: items=%d' % len(items))
+    if not items and not strict_space and filter_keyword:
+        data = _search_by_keyword(filter_keyword, page=1)
+        try:
+            for v in data["data"]["result"]:
+                bvid = v.get("bvid")
+                if not bvid:
+                    continue
+                items.append({
+                    "bvid": bvid,
+                    "title": v.get("title"),
+                    "url": f"https://www.bilibili.com/video/{bvid}",
+                    "pubdate": int(v.get("pubdate") or 0),
+                    "stats": {"views": v.get("play"), "comments": v.get("review")}
+                })
+        except Exception:
+            pass
+
+    # 空间内关键词过滤 + 时间排序
+    if filter_keyword:
+        items = [x for x in items if filter_keyword.lower() in (x.get("title") or "").lower()]
+    if DEBUG: print('[dbg] after filter & sort: items=%d' % len(items))
+
+    items.sort(key=lambda x: x.get("pubdate", 0), reverse=True)
+
+    out: List[Video] = []
+    for it in items[:limit]:
+        out.append(Video(**it))
+    return out
+
+def fetch_comments(bvid: str, max_comments: int = 200) -> List[Dict[str, Any]]:
+    """
+    用 aid 拉取对应视频评论（top-level + 少量二级抽样）
+    """
+    out: List[Dict[str, Any]] = []
+    aid = _bvid_to_aid(bvid)
+    if not aid:
+        return out
+
+    url = "https://api.bilibili.com/x/v2/reply"
+    params = {"type": 1, "oid": aid, "sort": 2, "ps": 20, "pn": 1}
+
+    pages = max(1, max_comments // 20)
+    for pn in range(1, pages + 1):
+                      filter_keyword: str = "",
+                      limit: int = 10,
+                      strict_space: bool = True) -> List[Video]:
+
+    if DEBUG:
+        print(f"[dbg] list_space_videos: start, strict_space={strict_space}, keyword='{filter_keyword}'")
+
+    items = []
+    mid = _mid_from_space_url(space_url)
+
+    # A：WBI
+    if mid:
+        data = _space_videos_wbi(mid, page=1, ps=max(30, limit))
+        try:
+            vlist = data["data"]["list"]["vlist"]
+            for v in vlist:
+                bvid = v.get("bvid")
+                if not bvid:
+                    continue
+                items.append({
+                    "bvid": bvid,
+                    "title": v.get("title") or "",
+                    "url": f"https://www.bilibili.com/video/{bvid}",
+                    "pubdate": int(v.get("created") or v.get("pubdate") or 0),
+                    "stats": {"views": v.get("play"), "comments": v.get("comment")}
+                })
+        except Exception:
+            pass
+
+    if DEBUG:
+        print(f"[dbg] after WBI: items={len(items)}")
+
+    # B：HTML（只空间）
+    if not items:
+        html_items = _space_html_videos(space_url, limit=max(30, limit))
+        if html_items:
+            items.extend(html_items)
+
+    if DEBUG:
+        print(f"[dbg] after HTML: items={len(items)}")
+
+    # C：仅在 strict_space=False 时允许用“全站关键词”兜底
+    if (not items) and (not strict_space) and filter_keyword:
+        data = _search_by_keyword(filter_keyword, page=1)
+        try:
+            for v in data["data"]["result"]:
+                bvid = v.get("bvid")
+                if not bvid:
+                    continue
+                items.append({
+                    "bvid": bvid,
+                    "title": v.get("title") or "",
+                    "url": f"https://www.bilibili.com/video/{bvid}",
+                    "pubdate": int(v.get("pubdate") or 0),
+                    "stats": {"views": v.get("play"), "comments": v.get("review")}
+                })
+        except Exception:
+            pass
+
+    # 关键词过滤（仅对已获取 items 做包含匹配）
+        # --- list_space_videos：替换“时间排序与输出”这一段到函数结束 ---
+        # 关键词过滤（仅对已获取 items 做包含匹配）
+        if filter_keyword:
+            key = (filter_keyword or "").lower()
+            items = [x for x in items if key in (x.get("title") or "").lower()]
+
+        # 时间排序并截断（注意：必须在函数体内）
+        items.sort(key=lambda x: x.get("pubdate", 0), reverse=True)
+
+        if DEBUG:
+            print(f"[dbg] after filter & sort: items={len(items)}")
+
+        # 输出对象化列表
+        out: List[Video] = []
+        for it in items[:limit]:
+            out.append(Video(**it))
+        return out
+
+    # --- fetch_comments：整段替换 ---
+    def fetch_comments(bvid: str, max_comments: int = 200) -> List[Dict[str, Any]]:
+        """
+        用 aid 拉取对应视频评论（仅顶层 + 少量二级采样），统一输出包含 'text' 字段的列表。
+        """
+        out: List[Dict[str, Any]] = []
+        aid = _bvid_to_aid(bvid)
+        if not aid:
+            return out
+
+        url = "https://api.bilibili.com/x/v2/reply"
+        ps = 20
+        pages = max(1, (int(max_comments) + ps - 1) // ps)
+
+        for pn in range(1, pages + 1):
+            params = {"type": 1, "oid": aid, "sort": 2, "ps": ps, "pn": pn}
+            data = _safe_get(url, params=params) or {}
+            replies = (((data.get("data") or {}).get("replies")) or [])
+            if not replies:
+                break
+
+            for r in replies:
+                c = r.get("content") or {}
+                txt = c.get("message", "")
+                if txt:
+                    out.append({
+                        "text": txt,
+                        "like": r.get("like", 0),
+                        "ctime": r.get("ctime", 0),
+                        "mid": (r.get("member") or {}).get("mid"),
+                        "uname": ((r.get("member") or {}).get("uname")),
+                    })
+                # 采样少量二级评论（如有）
+                for rr in (r.get("replies") or [])[:3]:
+                    cc = rr.get("content") or {}
+                    t2 = cc.get("message", "")
+                    if t2:
+                        out.append({
+                            "text": t2,
+                            "like": rr.get("like", 0),
+                            "ctime": rr.get("ctime", 0),
+                            "mid": (rr.get("member") or {}).get("mid"),
+                            "uname": ((rr.get("member") or {}).get("uname")),
+                        })
+
+            if len(out) >= max_comments:
+                break
+
+        return out[:max_comments]

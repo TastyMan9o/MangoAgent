@@ -1,0 +1,6 @@
+Analyze the provided video. Return a JSON object with three keys: "english_description", "chinese_title", and "video_summary".
+- "english_description": A rich, descriptive paragraph in English about the video's visual elements. This will be the main prompt topic.
+- "chinese_title": A short, descriptive, filename-friendly title in Chinese, under 15 characters.
+- "video_summary": A concise, one-sentence summary of the video's content in Chinese. This is for display in the UI.
+
+Original video title for context: "{hotspot_title}"

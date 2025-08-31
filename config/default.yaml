@@ -1,0 +1,14 @@
+runtime:
+  device: "cpu"
+  seed: 42
+
+hotspot:
+  keywords: ["cat", "可爱"]
+  lookback_days: 7
+  top_k: 5
+  score_weights: {views: 0.5, likes: 0.2, comments: 0.2, danmaku: 0.1}
+
+prompt:
+  aspect_ratio: "16:9"
+  person_generation: "dont_allow"
+  negative_prompt: "cartoon, drawing, low quality, overexposure, blurry"
