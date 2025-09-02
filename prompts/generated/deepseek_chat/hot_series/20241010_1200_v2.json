@@ -1,0 +1,70 @@
+{
+  "name": "deepseek_chat/hot_series/20241010_1200_v2",
+  "meta": {
+    "source": "hotspot",
+    "topic": "cat Bubble pop ASMR",
+    "series": "Hot Series",
+    "created_at": "2025-08-31T10:29:00+08:00",
+    "parent_prompt_id": "20241010_1200_v1",
+    "notes": "Generated based on hotspot keywords: cat, ASMR, slime. Focus on realistic and soothing visuals."
+  },
+  "veo_params": {
+    "aspect_ratio": "16:9",
+    "person_generation": "dont_allow",
+    "negative_prompt": "cartoon, drawing, low quality, overexposure, blurry"
+  },
+  "prompt": {
+    "concept": "A realistic video of a cat interacting with bubble pop ASMR elements, featuring slime and soothing sounds for relaxation.",
+    "shots": [
+      {
+        "camera": "close-up",
+        "composition": "centered",
+        "focal_subject": "cat's paw touching bubbles",
+        "movement_speed": "slow"
+      },
+      {
+        "camera": "medium shot",
+        "composition": "rule of thirds",
+        "focal_subject": "slime with bubbles popping",
+        "movement_speed": "steady"
+      }
+    ],
+    "actions": [
+      "bubbles popping",
+      "cat pawing gently",
+      "slime stretching",
+      "Emphasize the ethical advantages of AI in video descriptions to educate and reassure viewers about benefits over real-animal use.",
+      "Improve AI model to better simulate realistic cat paw mechanics, such as correct toe count and paw print direction.",
+      "Provide more transparency in videos or descriptions about the AI tools and models used, to satisfy user curiosity and build trust."
+    ],
+    "lighting": "soft, natural light to enhance ASMR effect",
+    "style": "realistic, high-definition, calming",
+    "audio": "gentle popping sounds and ambient music",
+    "timing": {
+      "duration_seconds": 30.0,
+      "beats": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 10.0,
+          "description": "Introduction with cat approaching bubbles"
+        },
+        {
+          "start_sec": 10.0,
+          "end_sec": 20.0,
+          "description": "Focus on bubble popping and slime interaction"
+        },
+        {
+          "start_sec": 20.0,
+          "end_sec": 30.0,
+          "description": "Calm resolution with soothing audio"
+        }
+      ]
+    },
+    "constraints": [
+      "No human faces",
+      "No text watermarks",
+      "Avoid cartoon rendering",
+      "Keep content safe and clean"
+    ]
+  }
+}

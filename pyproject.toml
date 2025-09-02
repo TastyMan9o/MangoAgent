@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mango-agent"
+version = "0.1.0"
+description = "VideoAgent / MangoAgent: 自动化视频灵感助手"
+authors = [
+  { name = "MangoAgent Maintainers" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+known_first_party = ["agent"]
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = ["E203", "W503"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-q"
+testpaths = [
+  "tests"
+]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+strict = false
+
+[tool.uvicorn]
+factory = false
+host = "127.0.0.1"
+port = 8001
+reload = true
+app = "main:app" 

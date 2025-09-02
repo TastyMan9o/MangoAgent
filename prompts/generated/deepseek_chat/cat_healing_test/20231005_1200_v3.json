@@ -1,0 +1,62 @@
+{
+  "name": "deepseek_chat/cat_healing_test/20231005_1200_v3",
+  "meta": {
+    "source": "manual",
+    "topic": "A cat paw gently pressing colorful, clear slime with bubbles",
+    "series": "Cat Healing Test",
+    "created_at": "2025-08-30T16:48:19+08:00",
+    "parent_prompt_id": "20231005_1200_v2",
+    "notes": "Generated based on hotspot keywords: cat, ASMR, slime. Focus on soothing and realistic visuals."
+  },
+  "veo_params": {
+    "aspect_ratio": "9:16",
+    "person_generation": "dont_allow",
+    "negative_prompt": "cartoon, drawing, low quality, overexposure, blurry"
+  },
+  "prompt": {
+    "concept": "A close-up video of a cat's paw gently pressing into colorful, clear slime with bubbles, creating a calming ASMR effect.",
+    "shots": [
+      {
+        "camera": "close-up",
+        "composition": "centered on the paw and slime",
+        "focal_subject": "cat paw and slime interaction",
+        "movement_speed": "slow"
+      }
+    ],
+    "actions": [
+      "pressing slime gently",
+      "bubbles forming and popping",
+      "paw retracting slowly",
+      "very slow zoom-in throughout the shot"
+    ],
+    "lighting": "warm, natural light like a sunset to enhance colors and details",
+    "style": "realistic, high-definition, soothing",
+    "audio": "gentle ASMR sounds of squishing and bubbles",
+    "timing": {
+      "duration_seconds": 15.0,
+      "beats": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 5.0,
+          "description": "Paw approaches and starts pressing into slime"
+        },
+        {
+          "start_sec": 5.0,
+          "end_sec": 10.0,
+          "description": "Paw fully presses, bubbles form and move"
+        },
+        {
+          "start_sec": 10.0,
+          "end_sec": 15.0,
+          "description": "Paw retracts slowly, leaving impressions"
+        }
+      ]
+    },
+    "constraints": [
+      "No human faces",
+      "No text watermarks",
+      "Avoid cartoon rendering",
+      "Keep visuals clean and safe"
+    ]
+  }
+}

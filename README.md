@@ -10,6 +10,39 @@
 - **Web用户界面**: 使用Streamlit构建了功能完善的可视化操作后台，包括扫码登录、参数调整、交互式优化等。
 - **API服务**: 使用FastAPI构建了清晰的后端服务，实现了前后端分离。
 
+## 🧱 项目结构（标准化）
+
+```text
+MangoAgent/
+  ├─ agent/                 # 业务核心代码（按领域分层）
+  │   ├─ brain/             # Agent大脑与工具
+  │   ├─ collectors/        # 外部数据采集
+  │   ├─ enhancers/         # 能力增强模块（多模态、扩展）
+  │   ├─ generators/        # 生成器（Flow、Veo等）
+  │   ├─ graph/             # 流程图与状态管理
+  │   ├─ hotspot/           # 热点发现逻辑
+  │   ├─ interactive/       # 交互优化
+  │   ├─ iterators/         # 版本迭代
+  │   ├─ miners/            # 评论挖掘、洞察
+  │   ├─ prompt/            # Prompt编排与Schema
+  │   ├─ registry/          # 索引与注册
+  │   ├─ reports/           # 报表输出
+  │   └─ utils/             # 工具方法
+  ├─ cli/                   # 命令行入口
+  ├─ config/                # 配置（环境、日志）
+  ├─ prompts/               # 生成产物与样例
+  ├─ tests/                 # 单元/集成测试（新增）
+  ├─ docs/                  # 文档（新增）
+  ├─ scripts/               # 运维与启动脚本（新增）
+  ├─ app.py                 # Streamlit 前端入口
+  ├─ main.py                # FastAPI 后端入口
+  ├─ pyproject.toml         # 统一工具链配置（新增）
+  ├─ requirements.txt       # 运行依赖
+  └─ README.md
+```
+
+> 本次标准化不移动现有模块，以零破坏为原则，仅新增通用工程文件与目录。
+
 ## 🚀 如何启动
 
 本项目包含一个后端API服务和一个前端UI，需要同时启动。
