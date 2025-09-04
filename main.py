@@ -67,7 +67,7 @@ class AgentQuery(BaseModel):
     model_name: str
 
 class GenerateVideoRequest(BaseModel):
-    prompt_content: str
+    prompt_paths: List[str]  # 改为支持多个prompt路径
     flow_url: Optional[str] = None
     debugging_port: Optional[int] = None
 
@@ -76,7 +76,7 @@ class HotspotRequest(BaseModel):
     weights: Dict[str, float]
 
 class VeoGenerateRequest(BaseModel):
-    prompt_content: Dict[str, Any]
+    prompt_path: str
 
 class ManualLinkRequest(BaseModel):
     video_url: str
@@ -152,13 +152,24 @@ async def poll_qr_status(qrcode_key: str):
 
 @app.get("/api/keys/get", tags=["API Management"], response_model=ApiKeys)
 async def get_api_keys():
-    s = Settings()
-    gemini_keys_str = os.getenv("GEMINI_API_KEYS", os.getenv("GEMINI_API_KEY", ""))
-    return ApiKeys(
-        deepseek_api_key=mask_key(s.deepseek_api_key),
-        gemini_api_keys=gemini_keys_str,
-        veo_api_key=mask_key(os.getenv("VEO_API_KEY"))
-    )
+    try:
+        # 安全地获取API密钥，不依赖Settings类
+        deepseek_key = os.getenv("DEEPSEEK_API_KEY", "")
+        gemini_keys_str = os.getenv("GEMINI_API_KEYS", os.getenv("GEMINI_API_KEY", ""))
+        veo_key = os.getenv("VEO_API_KEY", "")
+        
+        return ApiKeys(
+            deepseek_api_key=mask_key(deepseek_key) if deepseek_key else None,
+            gemini_api_keys=gemini_keys_str if gemini_keys_str else None,
+            veo_api_key=mask_key(veo_key) if veo_key else None
+        )
+    except Exception as e:
+        # 如果出现任何错误，返回空的API密钥状态
+        return ApiKeys(
+            deepseek_api_key=None,
+            gemini_api_keys=None,
+            veo_api_key=None
+        )
 
 @app.post("/api/keys/update", tags=["API Management"])
 async def update_api_keys(keys: UpdateApiKeysRequest):
@@ -170,11 +181,26 @@ async def update_api_keys(keys: UpdateApiKeysRequest):
             dotenv_path = find_dotenv()
         if keys.deepseek_api_key:
             set_key(dotenv_path, "DEEPSEEK_API_KEY", keys.deepseek_api_key)
+        else:
+            set_key(dotenv_path, "DEEPSEEK_API_KEY", "")
+            
         if keys.veo_api_key:
             set_key(dotenv_path, "VEO_API_KEY", keys.veo_api_key)
+        else:
+            set_key(dotenv_path, "VEO_API_KEY", "")
+            
         if keys.gemini_api_keys is not None:
-            key_list = [k.strip() for k in keys.gemini_api_keys.splitlines() if k.strip()]
-            set_key(dotenv_path, "GEMINI_API_KEYS", ",".join(key_list))
+            if keys.gemini_api_keys.strip():
+                key_list = [k.strip() for k in keys.gemini_api_keys.splitlines() if k.strip()]
+                set_key(dotenv_path, "GEMINI_API_KEYS", ",".join(key_list))
+                set_key(dotenv_path, "GEMINI_API_KEY", "")
+            else:
+                # 如果输入为空，清空密钥
+                set_key(dotenv_path, "GEMINI_API_KEYS", "")
+                set_key(dotenv_path, "GEMINI_API_KEY", "")
+        else:
+            # 如果没有提供，清空密钥
+            set_key(dotenv_path, "GEMINI_API_KEYS", "")
             set_key(dotenv_path, "GEMINI_API_KEY", "")
         return {"success": True, "message": "API密钥已成功更新！"}
     except Exception as e:
@@ -300,15 +326,46 @@ async def expand_prompt_api(request: ExpandRequest):
 @app.post("/api/generate/video", tags=["Video Generation"])
 async def generate_video(request: GenerateVideoRequest):
     try:
-        result = await asyncio.to_thread(
-            generate_video_in_flow,
-            request.prompt_content,
-            request.debugging_port,
-            request.flow_url
-        )
-        if result.get("success"):
-            return JSONResponse(content=result)
-        raise HTTPException(status_code=500, detail=result.get("message", "未知错误"))
+        results = []
+        
+        for prompt_path in request.prompt_paths:
+            # 从文件路径读取prompt内容
+            if not os.path.exists(prompt_path):
+                results.append({
+                    "success": False,
+                    "error": f"Prompt文件不存在: {prompt_path}",
+                    "prompt_path": prompt_path
+                })
+                continue
+            
+            try:
+                with open(prompt_path, 'r', encoding='utf-8') as f:
+                    prompt_content = f.read()
+                
+                # 调用Flow自动化，只传递必要的参数
+                result = await asyncio.to_thread(
+                    generate_video_in_flow,
+                    prompt_content
+                )
+                
+                result["prompt_path"] = prompt_path
+                results.append(result)
+                
+            except Exception as e:
+                results.append({
+                    "success": False,
+                    "error": f"处理prompt文件失败: {str(e)}",
+                    "prompt_path": prompt_path
+                })
+        
+        # 返回所有结果
+        return JSONResponse(content={
+            "results": results,
+            "total": len(request.prompt_paths),
+            "successful": len([r for r in results if r.get("success")]),
+            "failed": len([r for r in results if not r.get("success")])
+        })
+        
     except Exception as e:
         tb = traceback.format_exc(limit=3)
         log.error(f"generate_video failed: {e}\\n{tb}")
@@ -317,7 +374,14 @@ async def generate_video(request: GenerateVideoRequest):
 @app.post("/api/generate/veo", tags=["Video Generation"])
 async def generate_with_veo(request: VeoGenerateRequest):
     try:
-        result = submit_veo_generation_task(request.prompt_content)
+        # 从文件路径读取prompt内容
+        if not os.path.exists(request.prompt_path):
+            raise HTTPException(status_code=400, detail=f"Prompt文件不存在: {request.prompt_path}")
+        
+        with open(request.prompt_path, 'r', encoding='utf-8') as f:
+            prompt_content = f.read()
+        
+        result = submit_veo_generation_task(prompt_content)
         if result["success"]:
             return JSONResponse(content=result)
         else:
@@ -328,16 +392,40 @@ async def generate_with_veo(request: VeoGenerateRequest):
 @app.on_event("startup")
 async def startup_event():
     log.info("Application startup: Starting FlowTaskManager worker...")
-    flow_task_manager.start_worker()
+    
+    # 设置默认的API端口环境变量
+    if not os.getenv("API_PORT"):
+        os.environ["API_PORT"] = "8001"
+        log.info("Set default API_PORT to 8001")
+    
+    # 启动Flow任务管理器
+    try:
+        flow_task_manager.start_worker()
+        log.info("✅ FlowTaskManager worker started successfully")
+    except Exception as e:
+        log.error(f"❌ Failed to start FlowTaskManager worker: {e}")
+        # 即使启动失败，应用仍然可以运行
 
 @app.get("/api/flow/queue_status", tags=["Video Generation"])
 async def get_flow_queue_status():
     """获取当前Flow任务队列的状态"""
-    with flow_task_manager.lock:
+    try:
+        # 使用新的摘要方法获取更详细的状态
+        summary = flow_task_manager.get_queue_summary()
+        
+        # 添加一些有用的统计信息
+        summary["timestamp"] = time.time()
+        summary["uptime"] = time.time() - flow_task_manager.start_time if hasattr(flow_task_manager, 'start_time') else 0
+        
+        return summary
+    except Exception as e:
+        log.error(f"Error getting flow queue status: {e}")
         return {
-            "queued_tasks": len(flow_task_manager.task_queue),
-            "running_tasks": len(flow_task_manager.running_tasks),
-            "running_tasks_details": list(flow_task_manager.running_tasks.values())
+            "error": str(e),
+            "queued": 0,
+            "running": 0,
+            "completed": 0,
+            "failed": 0
         }
 
 @app.post("/api/agent/chat_stream", tags=["Agent Brain"])
@@ -353,27 +441,47 @@ async def agent_chat_stream(request: AgentQuery):
             }
             log.info(f"STREAM /api/agent/chat_stream provider={request.llm_provider} model={request.model_name}")
 
+            # 发送开始思考的信号
+            yield f"data: {json.dumps({'type': 'thinking_start', 'content': '开始分析用户请求...'})}\n\n"
+
             async for event in agent_brain.astream_events(inputs, version="v1"):
                 kind = event["event"]
 
                 if kind == "on_chat_model_stream":
                     chunk = event["data"]["chunk"]
                     if chunk.content:
-                        yield f"data: {json.dumps({'type': 'thought', 'content': chunk.content})}\\n\\n"
+                        yield f"data: {json.dumps({'type': 'thought', 'content': chunk.content})}\n\n"
 
                 elif kind == "on_tool_start":
                     tool_name = event["name"]
                     tool_args = event["data"].get("input", {})
-                    yield f"data: {json.dumps({'type': 'tool_start', 'tool_name': tool_name, 'tool_args': tool_args})}\\n\\n"
+                    
+                    # 发送工具开始调用的信号
+                    yield f"data: {json.dumps({'type': 'tool_start', 'tool_name': tool_name, 'tool_args': tool_args})}\n\n"
 
                 elif kind == "on_tool_end":
                     tool_name = event["name"]
                     tool_output = event["data"].get("output", "")
+                    
+                    # 格式化工具输出
                     if not isinstance(tool_output, (str, int, float, bool, list, dict, type(None))):
                         tool_output = str(tool_output)
-                    yield f"data: {json.dumps({'type': 'tool_end', 'tool_name': tool_name, 'output': tool_output})}\\n\\n"
+                    
+                    # 如果是列表或字典，尝试美化显示
+                    if isinstance(tool_output, (list, dict)):
+                        try:
+                            tool_output = json.dumps(tool_output, indent=2, ensure_ascii=False)
+                        except:
+                            tool_output = str(tool_output)
+                    
+                    yield f"data: {json.dumps({'type': 'tool_end', 'tool_name': tool_name, 'output': tool_output})}\n\n"
 
-            yield f"data: {json.dumps({'type': 'done'})}\\n\\n"
+                elif kind == "on_chain_end":
+                    # 发送思考完成的信号
+                    yield f"data: {json.dumps({'type': 'thinking_end', 'content': '分析完成'})}\n\n"
+
+            # 发送最终完成信号
+            yield f"data: {json.dumps({'type': 'done', 'content': '任务完成'})}\n\n"
 
         except Exception as e:
             tb = traceback.format_exc(limit=3)

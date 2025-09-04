@@ -8,7 +8,7 @@ param(
   [int]$DevtoolsPort     = 9222,
   [string]$ProxyAddress  = "http://127.0.0.1:7890",
   # 可选：如果你想一并打开 Flow 页面，把链接放这里；留空则只打开本地前端
-  [string]$FlowUrl       = ""
+  [string]$FlowUrl       = "https://labs.google/flow/about"
 )
 
 # Ensure console uses UTF-8 to avoid mojibake in Chinese output
@@ -44,7 +44,7 @@ if (-not $ChromePath) {
   exit 1
 }
 
-$ChromeProfile = "C:\Users\MSI\chrome-remote-profile"
+$ChromeProfile = "$env:USERPROFILE\chrome-remote-profile"
 if (-not (Test-Path $ChromeProfile)) { New-Item -ItemType Directory -Force -Path $ChromeProfile | Out-Null }
 
 if (-not (Test-DevToolsPort -port $DevtoolsPort)) {

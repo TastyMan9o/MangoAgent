@@ -98,26 +98,61 @@ def generate_video_with_browser_automation(prompt_path: str, debugging_port: int
         flow_url (str, optional): The URL of the Flow page. If provided, a new tab will be opened. Defaults to "".
     """
     print(f"🛠️ TOOL: Submitting prompt '{prompt_path}' to the Flow generation queue...")
+    
+    # 验证文件路径
+    if not os.path.exists(prompt_path):
+        error_msg = f"Error: Prompt file not found at '{prompt_path}'"
+        print(f"❌ {error_msg}")
+        return {"success": False, "message": error_msg}
+    
     try:
+        # 读取并验证JSON文件
+        print(f"📖 Reading prompt file: {prompt_path}")
         with open(prompt_path, 'r', encoding='utf-8') as f:
             prompt_obj = json.load(f)
 
-        prompt_text = json.dumps(prompt_obj, indent=2, ensure_ascii=False)
+        # 验证JSON结构
+        if not isinstance(prompt_obj, dict):
+            error_msg = "Error: Invalid JSON structure - expected object"
+            print(f"❌ {error_msg}")
+            return {"success": False, "message": error_msg}
 
+        prompt_text = json.dumps(prompt_obj, indent=2, ensure_ascii=False)
+        print(f"📝 Prompt content length: {len(prompt_text)} characters")
+
+        # 检查FlowTaskManager是否已初始化
+        if not hasattr(flow_task_manager, 'task_queue'):
+            error_msg = "Error: FlowTaskManager not properly initialized"
+            print(f"❌ {error_msg}")
+            return {"success": False, "message": error_msg}
+
+        # 提交任务到队列
+        print(f"📥 Adding task to Flow queue...")
         task_id = flow_task_manager.add_task(
             prompt_content=prompt_text,
             debugging_port=debugging_port,
             flow_url=flow_url
         )
+        print(f"✅ Task added successfully with ID: {task_id}")
 
         return {
             "success": True,
-            "message": f"✅ 任务已成功提交到后台队列！任务ID: {task_id}. The video is being generated in the background."
+            "message": f"✅ 任务已成功提交到后台队列！任务ID: {task_id}. The video is being generated in the background.",
+            "task_id": task_id,
+            "prompt_path": prompt_path,
+            "status": "queued"
         }
-    except FileNotFoundError:
-        return {"success": False, "message": f"Error: Prompt file not found at '{prompt_path}'"}
+    except json.JSONDecodeError as e:
+        error_msg = f"Error: Invalid JSON in prompt file: {e}"
+        print(f"❌ {error_msg}")
+        return {"success": False, "message": error_msg}
     except Exception as e:
-        return {"success": False, "message": f"Error submitting task to Flow queue: {e}"}
+        error_msg = f"Error submitting task to Flow queue: {e}"
+        print(f"❌ {error_msg}")
+        print(f"🔍 Exception type: {type(e).__name__}")
+        import traceback
+        print(f"📋 Traceback: {traceback.format_exc()}")
+        return {"success": False, "message": error_msg}
 
 @tool
 def get_flow_generation_status() -> Dict[str, Any]:
@@ -128,11 +163,34 @@ def get_flow_generation_status() -> Dict[str, Any]:
     """
     print("🛠️ TOOL: Checking Flow generation status...")
     try:
-        response = requests.get("http://127.0.0.1:8001/api/flow/queue_status", proxies={"http": None, "https" : None})
+        # 尝试从环境变量获取API端口，如果没有设置则使用默认值8001
+        api_port = os.getenv("API_PORT", "8001")
+        
+        # 构建API URL
+        api_url = f"http://127.0.0.1:{api_port}/api/flow/queue_status"
+        print(f"🔗 Checking Flow status at: {api_url}")
+        
+        response = requests.get(api_url, 
+                              proxies={"http": None, "https": None}, 
+                              timeout=10)
         response.raise_for_status()
-        return response.json()
+        
+        status_data = response.json()
+        print(f"📊 Flow status response: {status_data}")
+        return status_data
+        
+    except requests.exceptions.Timeout:
+        error_msg = "Timeout: API server not responding"
+        print(f"❌ {error_msg}")
+        return {"success": False, "message": error_msg}
+    except requests.exceptions.ConnectionError:
+        error_msg = f"Connection Error: Cannot connect to API server at port {api_port}"
+        print(f"❌ {error_msg}")
+        return {"success": False, "message": error_msg}
     except Exception as e:
-        return {"success": False, "message": f"Error fetching queue status: {e}"}
+        error_msg = f"Error fetching queue status: {e}"
+        print(f"❌ {error_msg}")
+        return {"success": False, "message": error_msg}
 
 available_tools = [
     list_available_prompts,

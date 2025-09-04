@@ -1,6 +1,49 @@
+# Python
 .venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Environment variables
 .env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
 outputs/
 prompts/index.json
+
+# Backup files
+*.bak
+*.bak2
+*.backup
+*.tmp
+
+# Debug and temporary files
+debug_*.py
+analyze_*.py
+check_*.py
+fix_*.py
+*_restructured.py
+
+# Logs
+*.log
+logs/
+
+# Cache
+.cache/
+.pytest_cache/

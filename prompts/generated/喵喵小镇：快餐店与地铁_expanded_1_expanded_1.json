@@ -1,0 +1,148 @@
+{
+  "topic": "A handcrafted miniature city for cats with detailed urban infrastructure",
+  "scenes": [
+    {
+      "scene_number": 1,
+      "description": "A young man installs a sign for 'MiaoDangLao's', a cat-themed fast-food restaurant, emphasizing the handcrafted nature of the project.",
+      "visual_elements": [
+        "miniature city",
+        "sign installation",
+        "human creator"
+      ],
+      "audio_elements": [
+        "gentle background music",
+        "creator's voice explaining the project"
+      ]
+    },
+    {
+      "scene_number": 2,
+      "description": "A sleek black Bombay cat named Marmalade interacts with the miniature environment, including a visit to a cat-sized subway station where the creator sits on the platform.",
+      "visual_elements": [
+        "Marmalade the cat",
+        "miniature subway station",
+        "human sitting"
+      ],
+      "audio_elements": [
+        "cat meows",
+        "ambient city sounds"
+      ]
+    },
+    {
+      "scene_number": 3,
+      "description": "The construction process is shown, including woodworking and tiling for the miniature structures.",
+      "visual_elements": [
+        "tools and materials",
+        "crafting details"
+      ],
+      "audio_elements": [
+        "sawing and hammering sounds"
+      ]
+    },
+    {
+      "scene_number": 4,
+      "description": "The creator furnishes 'MiaoDangLao's' with tiny tables and chairs, and a miniature pastel-colored vintage ice cream truck delivers more furniture.",
+      "visual_elements": [
+        "miniature furniture",
+        "pastel ice cream truck model"
+      ],
+      "audio_elements": [
+        "light instrumental music"
+      ]
+    },
+    {
+      "scene_number": 5,
+      "description": "Inside the restaurant, a mischievous Calico kitten named Luna plays the owner while Marmalade orders food.",
+      "visual_elements": [
+        "Luna the kitten",
+        "miniature restaurant interior"
+      ],
+      "audio_elements": [
+        "playful cat sounds"
+      ]
+    },
+    {
+      "scene_number": 6,
+      "description": "Transition to a real-world kitchen demonstrating a smart range hood, with Marmalade appearing as a chef, highlighting safe and clean cooking features.",
+      "visual_elements": [
+        "kitchen appliance",
+        "Marmalade in chef role"
+      ],
+      "audio_elements": [
+        "product demonstration voiceover",
+        "cooking sounds"
+      ]
+    },
+    {
+      "scene_number": 7,
+      "description": "Return to the miniature city where Marmalade travels by train to 'MiaoDangLao's' and is joined by Luna arriving on a miniature motorcycle.",
+      "visual_elements": [
+        "miniature train",
+        "motorcycle model",
+        "cats interacting"
+      ],
+      "audio_elements": [
+        "train sound effects",
+        "motorcycle revving"
+      ]
+    },
+    {
+      "scene_number": 8,
+      "description": "Both cats enjoy tiny burgers at the custom-built restaurant.",
+      "visual_elements": [
+        "miniature food",
+        "cats eating"
+      ],
+      "audio_elements": [
+        "happy cat purring",
+        "soft music"
+      ]
+    },
+    {
+      "scene_number": 9,
+      "description": "The creator thanks the sponsor and waves goodbye in front of the miniature creation.",
+      "visual_elements": [
+        "creator waving",
+        "sponsor acknowledgment"
+      ],
+      "audio_elements": [
+        "thank you message",
+        "closing music"
+      ]
+    }
+  ],
+  "style": "documentary-style with close-up shots and smooth transitions",
+  "duration_seconds": 180,
+  "target_audience": "cat lovers, DIY enthusiasts, and miniature art fans",
+  "additional_notes": "Ensure all visuals are safe and clean, with no real human faces shown; focus on the craftsmanship and cat interactions.",
+  "meta": {
+    "series": "Agent Analysis Series",
+    "topic": "The video showcases an intricate miniature city designed for cats, featuring remarkably detailed replicas of urban infrastructure. It opens with the creator, a young man, installing a sign for \"MiaoDangLao's,\" a cat-themed fast-food restaurant, emphasizing that this is a handcrafted project, not AI-generated. A sleek black Bombay cat, \"Marmalade,\" is introduced, interacting with the miniature environment, including a visit to a fully equipped cat-sized subway station, where the creator sits cross-legged on the platform. The construction process for these miniature structures is briefly shown, including woodworking and tiling. Later, the creator furnishes the \"MiaoDangLao's\" restaurant with tiny tables and chairs, and a miniature pastel-colored vintage ice cream truck delivers more furniture. Inside the restaurant, a mischievous Calico kitten, \"Luna,\" plays the role of the owner, while \"Marmalade\" orders food. The video then transitions to a real-world kitchen, demonstrating a smart range hood, highlighting its features for safe and clean cooking, with \"Marmalade\" also making an appearance as a \"chef.\" The narrative returns to the miniature city, where \"Marmalade\" travels by train to \"MiaoDangLao's\" and is joined by \"Luna,\" who dramatically arrives on a miniature motorcycle. Both pets then enjoy tiny burgers at their custom-built restaurant. The video concludes with the creator thanking the sponsor and waving goodbye in front of his impressive miniature creation.",
+    "created_at": "2025-09-03T15:05:42+08:00",
+    "parent_prompt_id": "喵喵小镇：快餐店与地铁_v1",
+    "source": "hotspot",
+    "video_summary": "一位创作者花费三个月为猫咪打造了专属喵喵小镇，复刻了地铁站和快餐店，让猫咪和仓鼠享受奇幻世界，并展示了智能抽油烟机的实用功能。"
+  },
+  "veo_params": {
+    "aspect_ratio": "16:9",
+    "person_generation": "dont_allow",
+    "negative_prompt": "cartoon, drawing, low quality, overexposure, blurry"
+  },
+  "prompt": {
+    "concept": "The video showcases an intricate miniature city designed for cats, featuring remarkably detailed replicas of urban infrastructure. It opens with the creator, a young man, installing a sign for \"MiaoDangLao's,\" a cat-themed fast-food restaurant, emphasizing that this is a handcrafted project, not AI-generated. A sleek black Bombay cat, \"Marmalade,\" is introduced, interacting with the miniature environment, including a visit to a fully equipped cat-sized subway station, where the creator sits cross-legged on the platform. The construction process for these miniature structures is briefly shown, including woodworking and tiling. Later, the creator furnishes the \"MiaoDangLao's\" restaurant with tiny tables and chairs, and a miniature pastel-colored vintage ice cream truck delivers more furniture. Inside the restaurant, a mischievous Calico kitten, \"Luna,\" plays the role of the owner, while \"Marmalade\" orders food. The video then transitions to a real-world kitchen, demonstrating a smart range hood, highlighting its features for safe and clean cooking, with \"Marmalade\" also making an appearance as a \"chef.\" The narrative returns to the miniature city, where \"Marmalade\" travels by train to \"MiaoDangLao's\" and is joined by \"Luna,\" who dramatically arrives on a miniature motorcycle. Both pets then enjoy tiny burgers at their custom-built restaurant. The video concludes with the creator thanking the sponsor and waving goodbye in front of his impressive miniature creation.",
+    "shots": [],
+    "actions": [],
+    "lighting": "soft key light with gentle rim light",
+    "style": "photorealistic, macro, shallow depth of field",
+    "audio": "subtle ASMR, low ambient",
+    "timing": {
+      "duration_seconds": 60.0,
+      "beats": []
+    },
+    "constraints": [
+      "No human faces",
+      "No text watermarks",
+      "Avoid cartoon rendering"
+    ]
+  },
+  "name": "喵喵小镇：快餐店与地铁_expanded_1_expanded_1"
+}
