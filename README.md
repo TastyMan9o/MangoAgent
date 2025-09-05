@@ -10,7 +10,7 @@ AI 驱动的 B 站热点分析与评论洞察系统，自动生成与迭代适�
 
 ### 🔥 热点发现与视频分析
 - **智能热点搜索**：按关键词抓取 B 站热门视频，采用可调权重的热度公式排序
-- **多模态视频分析**：集成 **Gemini 2.5 Flash/Pro** 模型，自动分析视频内容并生成英文 Prompt 与中文标题
+- **多模态视频分析**：集成 **Gemini 2.5 Flash** 模型，自动分析视频内容并生成英文 Prompt 与中文标题
 - **评论挖掘与迭代**：从评论区提炼视觉优化建议，使用 **DeepSeek** 模型产出新版本 Prompt
 
 ### 🧠 AI 大脑与工具调用
@@ -100,8 +100,7 @@ pip install -r requirements.txt
 # 安装开发工具（可选）
 pip install -r requirements-dev.txt
 
-# 安装 Playwright 浏览器内核（用于自动化）
-python -m playwright install chromium
+# 注意：项目使用 Selenium 进行浏览器自动化，不需要安装 Playwright
 ```
 
 ### 2. 一键启动（推荐）
@@ -161,9 +160,10 @@ streamlit run app.py
 - **requests**：HTTP 请求库
 
 ### 自动化工具
-- **Selenium**：浏览器自动化
-- **Playwright**：现代浏览器自动化
+- **Selenium**：浏览器自动化（主要）
 - **WebDriver Manager**：自动管理浏览器驱动
+- **psutil**：系统进程检测
+- **pyperclip**：剪贴板操作
 
 ---
 
@@ -288,6 +288,10 @@ streamlit run app.py
    - 确认 Python 版本 >= 3.10
    - 尝试使用国内镜像源
    - 逐个安装依赖包排查问题
+
+5. **Playwright 相关错误**
+   - 项目使用 Selenium，不需要安装 Playwright
+   - 如果看到 Playwright 相关错误，请忽略或从 requirements.txt 中移除
 
 ### 日志查看
 - 后端日志：控制台输出
