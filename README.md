@@ -100,7 +100,6 @@ pip install -r requirements.txt
 # 安装开发工具（可选）
 pip install -r requirements-dev.txt
 
-# 注意：项目使用 Selenium 进行浏览器自动化，不需要安装 Playwright
 ```
 
 ### 2. 一键启动（推荐）
